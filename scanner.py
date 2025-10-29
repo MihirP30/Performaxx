@@ -8,13 +8,15 @@ from io import BytesIO
 API_KEY = os.getenv("GEMINI_API_KEY") 
 client = genai.Client(api_key=API_KEY)
 
+image_response = None
+
 # *** IMPORTANT: Change the path to your actual image file ***
 IMAGE_PATH = r"C:\Users\zambe\Downloads\20251029_102651.jpg"
-PROMPT = "Analyse the perfomative maleness of this image, from 1 to 100. Assess it on this list: matcha, labubu, feminine literature, baggy jeans, rings, tote bag, wired headphones, vintage clothing. Provide a score and a brief explanation."
-GENERATION_PROMPT = "Generate a more performative male version of this image. Make sure all these items are somehow included in the image unless they already are: matcha, labubu, feminine literature, baggy jeans, rings, tote bag, wired headphones, vintage clothing."
+PROMPT = "Analyse the perfomative maleness of this image, from 1 to 100. Assess it ONLY on presence of items from this list: matcha, labubu, feminine literature, baggy jeans, rings, tote bag, wired headphones, vintage clothing. Higher scores indicate a stronger presence of these items. Provide a score and a brief explanation. Return a list of all items that could be added from the list and Amazon links to purchase them."
+GENERATION_PROMPT = "Generate a more performative male version of this image. Make sure all these items are somehow included in the image unless they already are: matcha, labubu, feminine literature, baggy jeans, rings, tote bag, wired headphones, vintage clothing. Keep background the same"
 
 # --- Step 1: Text Analysis (Use Gemini) ---
-print("--- Step 1: Analyzing image with gemini-2.5-flash... ---")
+print("--- Step 1: Analyzing image---")
 try:
     input_image = Image.open(IMAGE_PATH)
     
@@ -25,8 +27,10 @@ try:
     )
     
     # Print the analysis score and text
+    image_response = analysis_response.text
     print("\n Analysis Complete:")
-    print(analysis_response.text)
+    print(image_response)
+
 
 except FileNotFoundError:
     print(f"Error: Image file not found at {IMAGE_PATH}")
@@ -36,8 +40,8 @@ except Exception as e:
     print(f"An error occurred during analysis: {e}")
     exit()
 
-# --- Step 2: Image Generation (Use Imagen) ---
-print("\n--- Step 2: Generating new image with imagen-3.0-generate-002... ---")
+# --- Step 2: Image Generation ---
+print("\n--- Step 2: Generating new image... ---")
 try:
     # 2. GENERATION CALL
     # You need to pass the input image again for the image model to base its generation on.
