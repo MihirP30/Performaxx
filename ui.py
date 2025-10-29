@@ -2,6 +2,7 @@ import pygame
 import pygame_gui
 import os
 from scanner import analyze_image, generate_more_performative_image, AI_IMAGE_OUTPUT_PATH
+from music import play_song
 
 pygame.init()
 
@@ -147,6 +148,7 @@ def handle_improve_action():
             print("AI: Improvement Complete! New image displayed.")
         else:
             print("System: Failed to load generated image.")
+        play_song()
     else:
         print("System: Generation failed.")
 
