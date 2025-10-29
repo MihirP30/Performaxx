@@ -1,6 +1,7 @@
 import pygame
 import pygame_gui
 import os
+from scanner import analyze_image, generate_more_performative_image, AI_IMAGE_OUTPUT_PATH
 
 pygame.init()
 
@@ -27,7 +28,7 @@ image_rect = pygame.Rect(370, 120, 460, 280)
 # --- State ---
 user_image = None
 user_image_pos = None
-ai_image_path = "improved_image.png"
+current_image_path = None # Path of the currently displayed image file
 
 # --- Fonts ---
 pygame.font.init()
@@ -108,7 +109,6 @@ def draw_rounded_panel(rect, title, color_bg=CREAM):
 
 
 shopping_items = []
-chat_history = []
 
 
 def draw_button(rect, text, color_bg=PEACH, text_color=CREAM):
@@ -118,6 +118,38 @@ def draw_button(rect, text, color_bg=PEACH, text_color=CREAM):
     screen.blit(text_render, text_render.get_rect(center=rect.center))
 
 
+def handle_improve_action():
+    """
+    Called when the 'Improve' button is pressed. Orchestrates the full AI workflow.
+    """
+    global current_image_path, user_image, user_image_pos
+    
+    if not current_image_path:
+        print("System: Please upload an image first (click the box).")
+        return
+        
+    print("System: Starting image analysis (Step 1/2)...")
+
+    pil_image, analysis_result_text = analyze_image(current_image_path)
+
+    if pil_image is None:
+        print(analysis_result_text) # Display the error message
+        return
+    
+    print("System: Starting image generation (Step 2/2)...")
+    
+    if generate_more_performative_image(current_image_path):
+        img, pos = load_image(AI_IMAGE_OUTPUT_PATH)
+        if img is not None:
+            user_image = img
+            user_image_pos = pos
+            current_image_path = AI_IMAGE_OUTPUT_PATH
+            print("AI: Improvement Complete! New image displayed.")
+        else:
+            print("System: Failed to load generated image.")
+    else:
+        print("System: Generation failed.")
+
 while running:
     time_delta = clock.tick(60) / 1000
 
@@ -126,9 +158,19 @@ while running:
             running = False
 
         if event.type == pygame.USEREVENT:
+            if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                if event.ui_element == improve_btn:
+                    handle_improve_action()
+                
             if event.user_type == pygame_gui.UI_FILE_DIALOG_PATH_PICKED:
-                chosen = event.text
-                user_image, user_image_pos = load_image(chosen)
+                chosen_path = event.text
+                img, pos = load_image(chosen_path)
+                if img is not None:
+                    user_image = img
+                    user_image_pos = pos
+                    current_image_path = chosen_path
+                    print("System: Image loaded. Ready to Improve.")
+                
                 if file_dialog:
                     file_dialog.kill()
                     file_dialog = None
@@ -142,7 +184,7 @@ while running:
 
     manager.update(time_delta)
 
-    # --- Background ---
+    # --- Drawing ---
     screen.fill(MATCHA)
 
     # Panels
@@ -154,21 +196,18 @@ while running:
         text = small_font.render(f"- {item}", True, INK)
         screen.blit(text, (left_panel.x + 15, left_panel.y + 20 + i * 30))
 
-    # Draw chatbox placeholder
-    pygame.draw.rect(screen, CREAM, (right_panel.x + 10, right_panel.y + 40, 230, 200), border_radius=12)
-
-    # --- Image area ---
+    # Image area
     pygame.draw.rect(screen, CREAM, image_rect, border_radius=16)
     pygame.draw.rect(screen, DARK_MATCHA, image_rect, 2, border_radius=16)
-    if user_image:
+    if user_image and user_image_pos:
         screen.blit(user_image, user_image_pos)
     else:
         placeholder = font.render("Click to upload image", True, (70, 90, 60))
         screen.blit(placeholder, placeholder.get_rect(center=image_rect.center))
+        
 
-    # --- Music wave (placeholder) ---
-    pygame.draw.rect(screen, LIGHT_MATCHA, (500, 500, 220, 20), border_radius=8)
-    pygame.draw.line(screen, DARK_MATCHA, (510, 510), (710, 510), 2)
+    # Music wave (placeholder)
+    pygame.draw.rect(screen, DARK_MATCHA, (500, 500, 220, 20), border_radius=8)
 
     manager.draw_ui(screen)
     pygame.display.update()
