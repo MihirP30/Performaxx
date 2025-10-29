@@ -1,7 +1,8 @@
 import pygame
 import pygame_gui
 import os
-from scanner import analyze_image, generate_more_performative_image, AI_IMAGE_OUTPUT_PATH
+
+from scanner import analyze_image, generate_more_performative_image, AI_IMAGE_OUTPUT_PATH, performative_items
 from music import play_song
 from gemini_wrapper import GeminiClientWrapper
 
@@ -38,6 +39,7 @@ manager = pygame_gui.UIManager((WIDTH, HEIGHT), theme_data)
 left_panel = pygame.Rect(40, 80, 250, 460)
 right_panel = pygame.Rect(WIDTH - 290, 80, 250, 460)
 image_rect = pygame.Rect(370, 120, 460, 280)
+status_panel = pygame.Rect(right_panel.x + 10, right_panel.y + 20, 230, 380)
 
 # --- Fonts ---
 pygame.font.init()
@@ -75,6 +77,44 @@ shopping_items = []
 gemini = GeminiClientWrapper()
 chat_history = []  # stores tuples of (user_message, ai_response)
 
+performative_items = {
+    "matcha": {
+        "name": "Otsuka Green Tea Co Shizuoka Matcha Powder",
+        "price": 13.00
+    },
+    "labubu": {
+        "name": "POP MART Kasing Labubu The Monsters Exciting Macarons Figure",
+        "price": 37.99
+    },
+    "feminine_literature": {
+        "name": "Pride and Prejudice",
+        "price": 6.99
+    },
+    "flannel": {
+        "name": "Legendary Whitetails Men's Flannel Cedarwood Plaid Shirt",
+        "price": 58.09
+    },
+    "baggy_jeans": {
+        "name": "Baggy Skater Vintage Casual Jeans",
+        "price": 25.00
+    },
+    "tote_bag": {
+        "name": "Tote Bag",
+        "price": 17.99
+    },
+    "wired_headphones": {
+        "name": "Apple Wired Headphones",
+        "price": 19.99
+    },
+    "vintage_clothing": {
+        "name": "Thrifted Vintage Clothing",
+        "price": 0.00
+    },
+    "rings": {
+        "name": "Rings",
+        "price": 13.99
+    }
+}
 
 # ----------------- Utility Functions -----------------
 
@@ -120,7 +160,7 @@ def handle_improve_action():
     """Called when the 'Improve' button is pressed."""
     global current_image_path, user_image, user_image_pos
     if not current_image_path:
-        print("System: Please upload an image first (click the box).")
+        add_status("System: Please upload an image first (click the box).")
         return
 
     print("System: Starting image analysis (Step 1/2)...")
@@ -137,12 +177,13 @@ def handle_improve_action():
             user_image = img
             user_image_pos = pos
             current_image_path = AI_IMAGE_OUTPUT_PATH
-            print("AI: Improvement Complete! New image displayed.")
+            add_status("AI: Improvement Complete! New image displayed.")
         else:
+            add_status("System: Failed to load generated image.")
             print("System: Failed to load generated image.")
         play_song()
     else:
-        print("System: Generation failed.")
+        add_status("System: Generation failed.")
 
 
 # ----------------- Main Loop -----------------
@@ -193,7 +234,7 @@ while running:
 
     manager.update(time_delta)
 
-    # --- Drawing ---
+    # --- Drawing Main Window ---
     screen.fill(MATCHA)
 
     # Panels
