@@ -78,7 +78,7 @@ def play_preview(preview_url):
         pygame.mixer.music.stop()
         os.remove(tmp_path)
 
-def main():
+def play_song():
     print("🎧 Deezer Song Search & Preview Player 🎧")
     query = performative_male_songs[random.randint(1, len(performative_male_songs)-1)]
 
@@ -94,4 +94,4 @@ def main():
     play_preview(track["preview"])
 
 if __name__ == "__main__":
-    main()
+    play_song()
