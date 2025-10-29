@@ -4,6 +4,7 @@ import os
 
 from scanner import analyze_image, generate_more_performative_image, AI_IMAGE_OUTPUT_PATH, performative_items
 from music import play_song
+from gemini_wrapper import GeminiClientWrapper
 
 pygame.init()
 
@@ -20,55 +21,61 @@ PEACH = (247, 198, 163)
 DARK_MATCHA = (107, 122, 87)
 LIGHT_MATCHA = (192, 214, 163)
 
-manager = pygame_gui.UIManager((WIDTH, HEIGHT))
+# --- UI Manager and Theme ---
+theme_data = {
+    "button": {
+        "colours": {
+            "normal_bg": "#4B6043",
+            "hovered_bg": "#5E7255",
+            "active_bg": "#3C4F36",
+            "normal_text": "#F6F4EE"
+        },
+        "misc": {"border_width": "0", "shape": "rectangle", "shadow_width": "0"}
+    }
+}
+manager = pygame_gui.UIManager((WIDTH, HEIGHT), theme_data)
 
-# --- Layout rectangles ---
+# --- Layout Rectangles ---
 left_panel = pygame.Rect(40, 80, 250, 460)
 right_panel = pygame.Rect(WIDTH - 290, 80, 250, 460)
 image_rect = pygame.Rect(370, 120, 460, 280)
 status_panel = pygame.Rect(right_panel.x + 10, right_panel.y + 20, 230, 380)
-
-# --- State ---
-user_image = None
-user_image_pos = None
-current_image_path = None # Path of the currently displayed image file
 
 # --- Fonts ---
 pygame.font.init()
 font = pygame.font.SysFont("Poppins", 22, bold=True)
 small_font = pygame.font.SysFont("Poppins", 18)
 
-# --- Buttons ---
-# --- UIButton Style ---
-# --- UIButton Theme Setup (Dark Green Flat Button) ---
-theme_data = {
-    "button": {
-        "colours": {
-            "normal_bg": "#4B6043",      # dark matcha green
-            "hovered_bg": "#5E7255",     # lighter on hover
-            "active_bg": "#3C4F36",      # darker when clicked
-            "normal_text": "#F6F4EE"     # creamy white text
-        },
-        "misc": {
-            "border_width": "0",
-            "shape": "rectangle",
-            "shadow_width": "0"
-        }
-    }
-}
-
-manager = pygame_gui.UIManager((WIDTH, HEIGHT), theme_data)
-
+# --- Buttons and Input Fields ---
 improve_btn = pygame_gui.elements.UIButton(
     relative_rect=pygame.Rect((520, 430), (180, 50)),
     text='Improve',
     manager=manager
 )
 
+gemini_input = pygame_gui.elements.UITextEntryLine(
+    relative_rect=pygame.Rect((WIDTH - 280, 490), (180, 35)),
+    manager=manager
+)
 
+gemini_send_btn = pygame_gui.elements.UIButton(
+    relative_rect=pygame.Rect((WIDTH - 90, 490), (50, 35)),
+    text='→',
+    manager=manager
+)
+
+# --- State Variables ---
 file_dialog = None
 clock = pygame.time.Clock()
 running = True
+user_image = None
+user_image_pos = None
+current_image_path = None
+shopping_items = []
+
+# --- Gemini Setup ---
+gemini = GeminiClientWrapper()
+chat_history = []  # stores tuples of (user_message, ai_response)
 
 performative_items = {
     "matcha": {
@@ -109,17 +116,17 @@ performative_items = {
     }
 }
 
+# ----------------- Utility Functions -----------------
+
 def load_image(path):
     """Load and scale image to fit inside image_rect while preserving aspect ratio."""
     try:
         img = pygame.image.load(path).convert_alpha()
         iw, ih = img.get_size()
         rw, rh = image_rect.size
-
         scale = min(rw / iw, rh / ih)
         new_size = (int(iw * scale), int(ih * scale))
         img = pygame.transform.smoothscale(img, new_size)
-
         offset_x = image_rect.x + (rw - new_size[0]) // 2
         offset_y = image_rect.y + (rh - new_size[1]) // 2
         return img, (offset_x, offset_y)
@@ -149,52 +156,21 @@ def draw_rounded_panel(rect, title, color_bg=CREAM):
     screen.blit(title_text, (rect.x + 5, rect.y - 30))
 
 
-shopping_items = []
-status_messages = []
-
-
-def add_status(message):
-    """Add a status message and print to terminal."""
-    print(message)
-    status_messages.append(message)
-    if len(status_messages) > 15:  # Keep last 15 messages
-        status_messages.pop(0)
-
-
-def draw_button(rect, text, color_bg=PEACH, text_color=CREAM):
-    """Draws a simple rounded button with centered text."""
-    pygame.draw.rect(screen, color_bg, rect, border_radius=12)
-    text_render = small_font.render(text, True, text_color)
-    screen.blit(text_render, text_render.get_rect(center=rect.center))
-
-
 def handle_improve_action():
-    """
-    Called when the 'Improve' button is pressed. Orchestrates the full AI workflow.
-    """
-    global current_image_path, user_image, user_image_pos, shopping_items
-    
+    """Called when the 'Improve' button is pressed."""
+    global current_image_path, user_image, user_image_pos
     if not current_image_path:
         add_status("System: Please upload an image first (click the box).")
         return
-        
-    add_status("System: Starting image analysis (Step 1/2)...")
 
-    pil_image, analysis_result_text, shopping_list = analyze_image(current_image_path)
+    print("System: Starting image analysis (Step 1/2)...")
+    pil_image, analysis_result_text = analyze_image(current_image_path)
 
     if pil_image is None:
-        add_status(analysis_result_text) # Display the error message
+        print(analysis_result_text)
         return
-    
-    # Update shopping items
-    if shopping_list and isinstance(shopping_list, list):
-        shopping_items = shopping_list
-        add_status(f"System: Found {len(shopping_items)} items to buy")
-    else:
-        add_status("System: No shopping items identified")
-    
-    add_status("System: Starting image generation (Step 2/2)...")
-    
+
+    print("System: Starting image generation (Step 2/2)...")
     if generate_more_performative_image(current_image_path):
         img, pos = load_image(AI_IMAGE_OUTPUT_PATH)
         if img is not None:
@@ -209,6 +185,8 @@ def handle_improve_action():
     else:
         add_status("System: Generation failed.")
 
+
+# ----------------- Main Loop -----------------
 while running:
     time_delta = clock.tick(60) / 1000
 
@@ -220,7 +198,21 @@ while running:
             if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
                 if event.ui_element == improve_btn:
                     handle_improve_action()
-                
+
+                if event.ui_element == gemini_send_btn:
+                    prompt = gemini_input.get_text().strip()
+                    if prompt:
+                        # Append instruction for shorter responses
+                        full_prompt = f"{prompt}\n\nKeep your response less than 15 words."
+                        try:
+                            response = gemini.generate_text(full_prompt)
+                            chat_history.append((prompt, response))
+                            print(f"You: {prompt}")
+                            print(f"Gemini: {response}")
+                        except Exception as e:
+                            print(f"Gemini Error: {e}")
+                        gemini_input.set_text("")
+
             if event.user_type == pygame_gui.UI_FILE_DIALOG_PATH_PICKED:
                 chosen_path = event.text
                 img, pos = load_image(chosen_path)
@@ -228,8 +220,7 @@ while running:
                     user_image = img
                     user_image_pos = pos
                     current_image_path = chosen_path
-                    add_status("System: Image loaded. Ready to Improve.")
-                
+                    print("System: Image loaded. Ready to Improve.")
                 if file_dialog:
                     file_dialog.kill()
                     file_dialog = None
@@ -250,36 +241,12 @@ while running:
     draw_rounded_panel(left_panel, "Shopping List")
     draw_rounded_panel(right_panel, "Consult Performaxx")
 
-    # Draw shopping list
-    for i in range(len(shopping_items)):
-        item_name = shopping_items[i]['name']
-        item_price = shopping_items[i]['price']
-        # Truncate if too long
-        if len(item_name) > 28:
-            item_name = item_name[:25] + "..."
-        text = small_font.render(f"• {item_name} - ${item_price}", True, INK)
-        screen.blit(text, (left_panel.x + 10, left_panel.y + 20 + i * 30))
+    # --- Draw Shopping List ---
+    for i, item in enumerate(shopping_items):
+        text = small_font.render(f"- {item}", True, INK)
+        screen.blit(text, (left_panel.x + 15, left_panel.y + 20 + i * 30))
 
-    # Draw status panel
-    pygame.draw.rect(screen, CREAM, status_panel, border_radius=12)
-    pygame.draw.rect(screen, DARK_MATCHA, status_panel, 2, border_radius=12)
-    
-    # Draw status title
-    status_title = small_font.render("Status Updates", True, DARK_MATCHA)
-    screen.blit(status_title, (status_panel.x + 10, status_panel.y + 10))
-    
-    # Draw status messages
-    y_offset = status_panel.y + 45
-    for msg in status_messages[-12:]:  # Show last 12 messages
-        color = DARK_MATCHA if "System" in msg else INK
-        # Wrap long messages
-        if len(msg) > 30:
-            msg = msg[:27] + "..."
-        text = small_font.render(msg, True, color)
-        screen.blit(text, (status_panel.x + 10, y_offset))
-        y_offset += 28
-
-    # Image area
+    # --- Image Display ---
     pygame.draw.rect(screen, CREAM, image_rect, border_radius=16)
     pygame.draw.rect(screen, DARK_MATCHA, image_rect, 2, border_radius=16)
     if user_image and user_image_pos:
@@ -287,9 +254,21 @@ while running:
     else:
         placeholder = font.render("Click to upload image", True, (70, 90, 60))
         screen.blit(placeholder, placeholder.get_rect(center=image_rect.center))
-        
 
-    # Music wave (placeholder)
+    # --- Draw Gemini Chat ---
+    y_offset = right_panel.y + 20
+    max_msgs = 6
+    visible = chat_history[-max_msgs:]
+
+    for user_msg, ai_msg in visible:
+        user_text = small_font.render(f"You: {user_msg}", True, INK)
+        ai_text = small_font.render(f"AI: {ai_msg}", True, DARK_MATCHA)
+        screen.blit(user_text, (right_panel.x + 10, y_offset))
+        y_offset += 25
+        screen.blit(ai_text, (right_panel.x + 10, y_offset))
+        y_offset += 40
+
+    # --- Music Wave Placeholder ---
     pygame.draw.rect(screen, DARK_MATCHA, (500, 500, 220, 20), border_radius=8)
 
     manager.draw_ui(screen)
