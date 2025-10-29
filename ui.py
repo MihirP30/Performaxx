@@ -11,7 +11,7 @@ WIDTH, HEIGHT = 1200, 600
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Performaxx")
 
-# --- Colors (Matcha × Labubu palette) ---
+# --- Colors ---
 MATCHA = (168, 198, 134)
 CREAM = (246, 244, 238)
 INK = (44, 44, 44)
@@ -25,7 +25,6 @@ manager = pygame_gui.UIManager((WIDTH, HEIGHT))
 left_panel = pygame.Rect(40, 80, 250, 460)
 right_panel = pygame.Rect(WIDTH - 290, 80, 250, 460)
 image_rect = pygame.Rect(370, 120, 460, 280)
-status_panel = pygame.Rect(right_panel.x + 10, right_panel.y + 20, 230, 380)
 
 # --- State ---
 user_image = None
@@ -69,43 +68,17 @@ file_dialog = None
 clock = pygame.time.Clock()
 running = True
 
+# --- Sample Performative Items ---
 performative_items = {
-    "matcha": {
-        "name": "Otsuka Green Tea Co Shizuoka Matcha Powder",
-        "price": 13.00
-    },
-    "labubu": {
-        "name": "POP MART Kasing Labubu The Monsters Exciting Macarons Figure",
-        "price": 37.99
-    },
-    "feminine_literature": {
-        "name": "Pride and Prejudice",
-        "price": 6.99
-    },
-    "flannel": {
-        "name": "Legendary Whitetails Men's Flannel Cedarwood Plaid Shirt",
-        "price": 58.09
-    },
-    "baggy_jeans": {
-        "name": "Baggy Skater Vintage Casual Jeans",
-        "price": 25.00
-    },
-    "tote_bag": {
-        "name": "Tote Bag",
-        "price": 17.99
-    },
-    "wired_headphones": {
-        "name": "Apple Wired Headphones",
-        "price": 19.99
-    },
-    "vintage_clothing": {
-        "name": "Thrifted Vintage Clothing",
-        "price": 0.00
-    },
-    "rings": {
-        "name": "Rings",
-        "price": 13.99
-    }
+    "matcha": {"name": "Otsuka Green Tea Co Shizuoka Matcha Powder", "price": 13.00},
+    "labubu": {"name": "POP MART Kasing Labubu The Monsters Exciting Macarons Figure", "price": 37.99},
+    "feminine_literature": {"name": "Pride and Prejudice", "price": 6.99},
+    "flannel": {"name": "Legendary Whitetails Men's Flannel Cedarwood Plaid Shirt", "price": 58.09},
+    "baggy_jeans": {"name": "Baggy Skater Vintage Casual Jeans", "price": 25.00},
+    "tote_bag": {"name": "Tote Bag", "price": 17.99},
+    "wired_headphones": {"name": "Apple Wired Headphones", "price": 19.99},
+    "vintage_clothing": {"name": "Thrifted Vintage Clothing", "price": 0.00},
+    "rings": {"name": "Rings", "price": 13.99}
 }
 
 def load_image(path):
@@ -137,7 +110,7 @@ def open_file_dialog():
 
 
 def draw_rounded_panel(rect, title, color_bg=CREAM):
-    """Draws a soft rounded panel with a title and light shadow."""
+    """Draw a soft rounded panel with a title."""
     shadow_rect = rect.copy()
     shadow_rect.x += 3
     shadow_rect.y += 3
@@ -174,7 +147,7 @@ def handle_improve_action():
     global current_image_path, user_image, user_image_pos, shopping_items
     
     if not current_image_path:
-        add_status("System: Please upload an image first (click the box).")
+        print("System: Please upload an image first.")
         return
         
     add_status("System: Starting image analysis (Step 1/2)...")
@@ -200,12 +173,9 @@ def handle_improve_action():
             user_image = img
             user_image_pos = pos
             current_image_path = AI_IMAGE_OUTPUT_PATH
-            add_status("AI: Improvement Complete! New image displayed.")
+            play_song()
         else:
             print("System: Failed to load generated image.")
-        play_song()
-    else:
-        add_status("System: Generation failed.")
 
 while running:
     time_delta = clock.tick(60) / 1000
@@ -232,7 +202,7 @@ while running:
                     file_dialog.kill()
                     file_dialog = None
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if image_rect.collidepoint(event.pos):
                 if not file_dialog:
                     file_dialog = open_file_dialog()
@@ -241,10 +211,9 @@ while running:
 
     manager.update(time_delta)
 
-    # --- Drawing Main Window ---
+    # --- Drawing ---
     screen.fill(MATCHA)
 
-    # Panels
     draw_rounded_panel(left_panel, "Shopping List")
     draw_rounded_panel(right_panel, "Consult Performaxx")
 
