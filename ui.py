@@ -1,7 +1,8 @@
 import pygame
 import pygame_gui
 import os
-from scanner import analyze_image, generate_more_performative_image, AI_IMAGE_OUTPUT_PATH
+
+from scanner import analyze_image, generate_more_performative_image, AI_IMAGE_OUTPUT_PATH, performative_items
 from music import play_song
 
 pygame.init()
@@ -25,6 +26,7 @@ manager = pygame_gui.UIManager((WIDTH, HEIGHT))
 left_panel = pygame.Rect(40, 80, 250, 460)
 right_panel = pygame.Rect(WIDTH - 290, 80, 250, 460)
 image_rect = pygame.Rect(370, 120, 460, 280)
+status_panel = pygame.Rect(right_panel.x + 10, right_panel.y + 20, 230, 380)
 
 # --- State ---
 user_image = None
@@ -68,6 +70,44 @@ file_dialog = None
 clock = pygame.time.Clock()
 running = True
 
+performative_items = {
+    "matcha": {
+        "name": "Otsuka Green Tea Co Shizuoka Matcha Powder",
+        "price": 13.00
+    },
+    "labubu": {
+        "name": "POP MART Kasing Labubu The Monsters Exciting Macarons Figure",
+        "price": 37.99
+    },
+    "feminine_literature": {
+        "name": "Pride and Prejudice",
+        "price": 6.99
+    },
+    "flannel": {
+        "name": "Legendary Whitetails Men's Flannel Cedarwood Plaid Shirt",
+        "price": 58.09
+    },
+    "baggy_jeans": {
+        "name": "Baggy Skater Vintage Casual Jeans",
+        "price": 25.00
+    },
+    "tote_bag": {
+        "name": "Tote Bag",
+        "price": 17.99
+    },
+    "wired_headphones": {
+        "name": "Apple Wired Headphones",
+        "price": 19.99
+    },
+    "vintage_clothing": {
+        "name": "Thrifted Vintage Clothing",
+        "price": 0.00
+    },
+    "rings": {
+        "name": "Rings",
+        "price": 13.99
+    }
+}
 
 def load_image(path):
     """Load and scale image to fit inside image_rect while preserving aspect ratio."""
@@ -110,6 +150,15 @@ def draw_rounded_panel(rect, title, color_bg=CREAM):
 
 
 shopping_items = []
+status_messages = []
+
+
+def add_status(message):
+    """Add a status message and print to terminal."""
+    print(message)
+    status_messages.append(message)
+    if len(status_messages) > 15:  # Keep last 15 messages
+        status_messages.pop(0)
 
 
 def draw_button(rect, text, color_bg=PEACH, text_color=CREAM):
@@ -123,21 +172,28 @@ def handle_improve_action():
     """
     Called when the 'Improve' button is pressed. Orchestrates the full AI workflow.
     """
-    global current_image_path, user_image, user_image_pos
+    global current_image_path, user_image, user_image_pos, shopping_items
     
     if not current_image_path:
-        print("System: Please upload an image first (click the box).")
+        add_status("System: Please upload an image first (click the box).")
         return
         
-    print("System: Starting image analysis (Step 1/2)...")
+    add_status("System: Starting image analysis (Step 1/2)...")
 
-    pil_image, analysis_result_text = analyze_image(current_image_path)
+    pil_image, analysis_result_text, shopping_list = analyze_image(current_image_path)
 
     if pil_image is None:
-        print(analysis_result_text) # Display the error message
+        add_status(analysis_result_text) # Display the error message
         return
     
-    print("System: Starting image generation (Step 2/2)...")
+    # Update shopping items
+    if shopping_list and isinstance(shopping_list, list):
+        shopping_items = shopping_list
+        add_status(f"System: Found {len(shopping_items)} items to buy")
+    else:
+        add_status("System: No shopping items identified")
+    
+    add_status("System: Starting image generation (Step 2/2)...")
     
     if generate_more_performative_image(current_image_path):
         img, pos = load_image(AI_IMAGE_OUTPUT_PATH)
@@ -145,12 +201,13 @@ def handle_improve_action():
             user_image = img
             user_image_pos = pos
             current_image_path = AI_IMAGE_OUTPUT_PATH
-            print("AI: Improvement Complete! New image displayed.")
+            add_status("AI: Improvement Complete! New image displayed.")
         else:
+            add_status("System: Failed to load generated image.")
             print("System: Failed to load generated image.")
         play_song()
     else:
-        print("System: Generation failed.")
+        add_status("System: Generation failed.")
 
 while running:
     time_delta = clock.tick(60) / 1000
@@ -171,7 +228,7 @@ while running:
                     user_image = img
                     user_image_pos = pos
                     current_image_path = chosen_path
-                    print("System: Image loaded. Ready to Improve.")
+                    add_status("System: Image loaded. Ready to Improve.")
                 
                 if file_dialog:
                     file_dialog.kill()
@@ -186,7 +243,7 @@ while running:
 
     manager.update(time_delta)
 
-    # --- Drawing ---
+    # --- Drawing Main Window ---
     screen.fill(MATCHA)
 
     # Panels
@@ -194,9 +251,33 @@ while running:
     draw_rounded_panel(right_panel, "Consult Performaxx")
 
     # Draw shopping list
-    for i, item in enumerate(shopping_items):
-        text = small_font.render(f"- {item}", True, INK)
-        screen.blit(text, (left_panel.x + 15, left_panel.y + 20 + i * 30))
+    for i in range(len(shopping_items)):
+        item_name = shopping_items[i]['name']
+        item_price = shopping_items[i]['price']
+        # Truncate if too long
+        if len(item_name) > 28:
+            item_name = item_name[:25] + "..."
+        text = small_font.render(f"• {item_name} - ${item_price}", True, INK)
+        screen.blit(text, (left_panel.x + 10, left_panel.y + 20 + i * 30))
+
+    # Draw status panel
+    pygame.draw.rect(screen, CREAM, status_panel, border_radius=12)
+    pygame.draw.rect(screen, DARK_MATCHA, status_panel, 2, border_radius=12)
+    
+    # Draw status title
+    status_title = small_font.render("Status Updates", True, DARK_MATCHA)
+    screen.blit(status_title, (status_panel.x + 10, status_panel.y + 10))
+    
+    # Draw status messages
+    y_offset = status_panel.y + 45
+    for msg in status_messages[-12:]:  # Show last 12 messages
+        color = DARK_MATCHA if "System" in msg else INK
+        # Wrap long messages
+        if len(msg) > 30:
+            msg = msg[:27] + "..."
+        text = small_font.render(msg, True, color)
+        screen.blit(text, (status_panel.x + 10, y_offset))
+        y_offset += 28
 
     # Image area
     pygame.draw.rect(screen, CREAM, image_rect, border_radius=16)
