@@ -160,15 +160,13 @@ def handle_improve_action():
     """Called when the 'Improve' button is pressed."""
     global current_image_path, user_image, user_image_pos
     if not current_image_path:
-        add_status("System: Please upload an image first (click the box).")
         return
 
     print("System: Starting image analysis (Step 1/2)...")
-    pil_image, analysis_result_text = analyze_image(current_image_path)
+    pil_image, analysis_result_text, shopping_list = analyze_image(current_image_path)
 
-    if pil_image is None:
-        print(analysis_result_text)
-        return
+    if shopping_list and isinstance(shopping_list, list):
+        shopping_items = shopping_list
 
     print("System: Starting image generation (Step 2/2)...")
     if generate_more_performative_image(current_image_path):
@@ -177,14 +175,9 @@ def handle_improve_action():
             user_image = img
             user_image_pos = pos
             current_image_path = AI_IMAGE_OUTPUT_PATH
-            add_status("AI: Improvement Complete! New image displayed.")
         else:
-            add_status("System: Failed to load generated image.")
             print("System: Failed to load generated image.")
         play_song()
-    else:
-        add_status("System: Generation failed.")
-
 
 # ----------------- Main Loop -----------------
 while running:
@@ -242,8 +235,10 @@ while running:
     draw_rounded_panel(right_panel, "Consult Performaxx")
 
     # --- Draw Shopping List ---
-    for i, item in enumerate(shopping_items):
-        text = small_font.render(f"- {item}", True, INK)
+    for i in shopping_items:
+        item_name = shopping_items[i]["name"]
+        item_price = shopping_items[i]['price']
+        text = small_font.render(f"- {item_name} - {item_price}", True, INK)
         screen.blit(text, (left_panel.x + 15, left_panel.y + 20 + i * 30))
 
     # --- Image Display ---
