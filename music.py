@@ -52,31 +52,29 @@ def show_results(tracks):
         print(f"{i}. {track['title']} — {track['artist']['name']}")
 
 def play_preview(preview_url):
-    """Download preview MP3 and play it."""
     if not preview_url:
         print("⚠️  No preview available for this song.")
         return
 
-    # Download to a temp file
     r = requests.get(preview_url)
     r.raise_for_status()
     with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
         tmp.write(r.content)
         tmp_path = tmp.name
 
-    # Play with pygame
     pygame.mixer.init()
     pygame.mixer.music.load(tmp_path)
     pygame.mixer.music.play()
-    print("🎶 Playing 30-second preview... (Ctrl+C to stop)")
+    print("🎶 Playing 30-second preview...")
 
-    # Wait while playing
-    try:
-        while pygame.mixer.music.get_busy():
-            pygame.time.Clock().tick(10)
-    finally:
-        pygame.mixer.music.stop()
-        os.remove(tmp_path)
+    # Do NOT block the main thread.
+    # Optionally start a background cleanup thread:
+    import threading, time
+    def cleanup():
+        time.sleep(35)
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+    threading.Thread(target=cleanup, daemon=True).start()
 
 def play_song():
     print("🎧 Deezer Song Search & Preview Player 🎧")
